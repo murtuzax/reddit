@@ -162,4 +162,49 @@ export const meHandler = async(req, res) => {
     }
 }
 
+export const handleRefresh = async (req, res) => {
+    try {
+        const {refreshToken} = req.cookies
+
+        if(!refreshToken) {
+            return res.status(401).json({
+                success:false,
+                message:"Request token not found"
+            })
+        }
+
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET)
+
+                const accessToken = jwt.sign({
+            id: decoded.id
+        }, process.env.JWT_SECRET, {
+            expiresIn: "15m"
+        })
+
+        const newRefreshToken = jwt.sign({
+            id: decoded.id
+        }, process.env.JWT_SECRET, {
+            expiresIn: "7d"
+        })
+
+                res.cookie("refreshToken", newRefreshToken, {
+            httpOnly: true,
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        })
+
+        res.status(200).json({
+            success: true,
+            message: "Access token refreshed successfully",
+            accessToken: accessToken
+        })
+
+    } catch (error) {
+        res.status(500).json({
+            message: "Internal server error",
+            success: false
+        })
+        console.log(error)
+    }
+}
+
 // Implement refresh token saving 
