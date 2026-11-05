@@ -1,6 +1,7 @@
 import { sql } from "../config/database.js"
 import argon2 from "argon2"
 import jwt from "jsonwebtoken"
+import crypto from "crypto"
 
 export const handleRegister = async (req, res) => {
     try {
@@ -32,16 +33,23 @@ export const handleRegister = async (req, res) => {
             RETURNING id
         `
 
-        const accessToken = jwt.sign({
-            id: user[0].id
-        }, process.env.JWT_SECRET, {
-            expiresIn: "15m"
-        })
-
         const refreshToken = jwt.sign({
             id: user[0].id
         }, process.env.JWT_SECRET, {
             expiresIn: "7d"
+        })
+
+        const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex")
+
+        await sql`
+            INSERT INTO sessions(user_id, refresh_token_hash, ip, user_agent)
+            VALUES(${user[0].id}, ${refreshTokenHash}, ${req.ip}, ${req.headers["user-agent"]})
+        `
+
+        const accessToken = jwt.sign({
+            id: user[0].id
+        }, process.env.JWT_SECRET, {
+            expiresIn: "15m"
         })
 
         res.cookie("refreshToken", refreshToken, {
@@ -109,7 +117,15 @@ export const handleLogin = async (req, res) => {
             expiresIn: "7d"
         })
 
-                res.cookie("refreshToken", refreshToken, {
+        const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex")
+
+        await sql`
+            INSERT INTO sessions(user_id, refresh_token_hash, ip, user_agent)
+            VALUES(${user[0].id}, ${refreshTokenHash}, ${req.ip}, ${req.headers["user-agent"]})
+        `
+
+
+        res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000
         })
@@ -130,31 +146,31 @@ export const handleLogin = async (req, res) => {
     }
 }
 
-export const meHandler = async(req, res) => {
+export const meHandler = async (req, res) => {
     try {
         const userId = req.user.id
 
         const user = await sql`
             SELECT id, username, email FROM users WHERE id=${userId}
         `
-        if(user.length===0) {
+        if (user.length === 0) {
             return res.status(404).json({
-                success:false,
-                message:"User not found"
+                success: false,
+                message: "User not found"
             })
         }
 
         res.status(200).json({
-            success:true,
-            message:"User returned successfully",
-            data:{
-                id:user[0].id,
-                username:user[0].username,
-                email:user[0].email
+            success: true,
+            message: "User returned successfully",
+            data: {
+                id: user[0].id,
+                username: user[0].username,
+                email: user[0].email
             }
         })
     } catch (error) {
-                res.status(500).json({
+        res.status(500).json({
             message: "Internal server error",
             success: false
         })
@@ -164,18 +180,31 @@ export const meHandler = async(req, res) => {
 
 export const handleRefresh = async (req, res) => {
     try {
-        const {refreshToken} = req.cookies
+        const { refreshToken } = req.cookies
 
-        if(!refreshToken) {
+        if (!refreshToken) {
             return res.status(401).json({
-                success:false,
-                message:"Request token not found"
+                success: false,
+                message: "Request token not found"
             })
         }
 
         const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET)
 
-                const accessToken = jwt.sign({
+        const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex")
+
+        const session = await sql`
+            SELECT 1 FROM sessions WHERE refresh_token_hash=${refreshTokenHash} AND revoked=false
+        `
+
+        if(session.length===0) {
+            return res.status(401).json({
+                success:false,
+                message:"Invalid Refresh Token"
+            })
+        }
+
+        const accessToken = jwt.sign({
             id: decoded.id
         }, process.env.JWT_SECRET, {
             expiresIn: "15m"
@@ -187,7 +216,16 @@ export const handleRefresh = async (req, res) => {
             expiresIn: "7d"
         })
 
-                res.cookie("refreshToken", newRefreshToken, {
+        const newRefreshTokenHash = crypto.createHash("sha256").update(newRefreshToken).digest("hex")
+
+
+        await sql`
+            UPDATE sessions
+            SET refresh_token_hash=${newRefreshTokenHash}
+            WHERE refresh_token_hash=${refreshTokenHash}
+        `
+
+        res.cookie("refreshToken", newRefreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000
         })
@@ -207,4 +245,47 @@ export const handleRefresh = async (req, res) => {
     }
 }
 
-// Implement refresh token saving 
+export const handleLogout = async (req, res) => {
+    try {
+        const { refreshToken } = req.cookies
+
+        if (!refreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: "Refresh token not found"
+            })
+        }
+
+        const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex")
+
+        const session = await sql`
+            SELECT 1 FROM sessions WHERE refresh_token_hash=${refreshTokenHash}
+        `
+
+        if(session.length===0) {
+            return res.status(404).json({
+                success:false
+            })
+        }
+
+        await sql`
+            UPDATE sessions
+            SET revoked=true
+            WHERE refresh_token_hash=${refreshTokenHash}
+        `
+
+        res.clearCookie("refreshToken")
+
+        res.status(200).json({
+            success:true,
+            message:"Logged out successfully"
+        })
+
+    } catch (error) {
+        res.status(500).json({
+            message: "Internal server error",
+            success: false
+        })
+        console.log(error)
+    }
+}

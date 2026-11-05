@@ -20,8 +20,24 @@ async function initDB() {
             password TEXT NOT NULL,
             display_name TEXT,
             bio TEXT,
-            avatar_ulr TEXT,
+            avatar_url TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `
+    await sql`
+        CREATE TABLE IF NOT EXISTS sessions(
+            user_id UUID NOT NULL,
+
+            refresh_token_hash TEXT NOT NULL,
+            ip TEXT NOT NULL,
+            user_agent TEXT NOT NULL,
+            revoked BOOLEAN NOT NULL DEFAULT FALSE,
+
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+            FOREIGN KEY(user_id) REFERENCES users(id)
+
         )
     `
 }
