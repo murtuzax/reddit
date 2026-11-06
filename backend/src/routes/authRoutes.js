@@ -8,7 +8,7 @@ router.post("/register", handleRegister)
 
 router.post("/login", handleLogin)
 
-router.post("/refresh", handleRefresh)
+router.get("/refresh", handleRefresh)
 
 router.get("/logout", handleLogout)
 

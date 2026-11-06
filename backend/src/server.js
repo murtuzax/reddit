@@ -2,14 +2,26 @@ import express from "express"
 import dotenv from "dotenv"
 import { sql } from "./config/database.js"
 import authRoutes from "./routes/authRoutes.js"
+import postRoutes from "./routes/postRoutes.js"
+import cors from "cors"
+import morgan from "morgan"
+import cookieParser from "cookie-parser"
 
 dotenv.config()
 
 const app = express()
 
 app.use(express.json())
+app.use(cors({
+        origin: "http://localhost:5173",
+    credentials: true
+}))
+app.use(morgan("dev"))
+app.use(cookieParser())
 
 app.use("/api/auth", authRoutes)
+
+app.use("/api/posts", postRoutes)
 
 async function initDB() {
     await sql`
@@ -38,6 +50,20 @@ async function initDB() {
 
             FOREIGN KEY(user_id) REFERENCES users(id)
 
+        )
+    `
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS posts(
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            author_id UUID NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+            FOREIGN KEY(author_id) REFERENCES users(id)
         )
     `
 }

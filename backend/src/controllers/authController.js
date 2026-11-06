@@ -30,7 +30,7 @@ export const handleRegister = async (req, res) => {
         const user = await sql`
             INSERT INTO users(username, email, password)
             VALUES (${username}, ${email}, ${hashedPassword})
-            RETURNING id
+            RETURNING id, username, email
         `
 
         const refreshToken = jwt.sign({
@@ -60,7 +60,7 @@ export const handleRegister = async (req, res) => {
         res.status(201).json({
             success: true,
             message: "User registered successfully",
-            data: { id: user[0].id },
+            data: { id: user[0].id, username:user[0].username, email:user[0].email },
             accessToken: accessToken
         })
 
@@ -86,7 +86,7 @@ export const handleLogin = async (req, res) => {
         }
 
         const user = await sql`
-            SELECT id, password FROM users WHERE email=${email}
+            SELECT id,username,email,password FROM users WHERE email=${email}
         `
 
         if (user.length === 0) {
@@ -127,13 +127,14 @@ export const handleLogin = async (req, res) => {
 
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            secure:false
         })
 
         res.status(200).json({
             success: true,
             message: "User verified successfully",
-            data: { id: user[0].id },
+            data: { id: user[0].id, username:user[0].username, email:user[0].email },
             accessToken: accessToken
         })
 
