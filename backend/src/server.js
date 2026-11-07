@@ -3,6 +3,7 @@ import dotenv from "dotenv"
 import { sql } from "./config/database.js"
 import authRoutes from "./routes/authRoutes.js"
 import postRoutes from "./routes/postRoutes.js"
+import communitiesRouter from "./routes/communitiesRoutes.js"
 import cors from "cors"
 import morgan from "morgan"
 import cookieParser from "cookie-parser"
@@ -13,7 +14,7 @@ const app = express()
 
 app.use(express.json())
 app.use(cors({
-        origin: "http://localhost:5173",
+    origin: "http://localhost:5173",
     credentials: true
 }))
 app.use(morgan("dev"))
@@ -22,6 +23,8 @@ app.use(cookieParser())
 app.use("/api/auth", authRoutes)
 
 app.use("/api/posts", postRoutes)
+
+app.use("/api/communities", communitiesRouter)
 
 async function initDB() {
     await sql`
@@ -53,17 +56,48 @@ async function initDB() {
         )
     `
 
+        await sql`
+        CREATE TABLE IF NOT EXISTS communities(
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            description TEXT,
+
+            author_id UUID NOT NULL,
+
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+            FOREIGN KEY(author_id) REFERENCES users(id)
+        )
+    `
+
     await sql`
         CREATE TABLE IF NOT EXISTS posts(
             id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
             author_id UUID NOT NULL,
             title TEXT NOT NULL,
             body TEXT NOT NULL,
+            community_id UUID,
 
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW(),
 
-            FOREIGN KEY(author_id) REFERENCES users(id)
+            FOREIGN KEY(author_id) REFERENCES users(id),
+            FOREIGN KEY(community_id) REFERENCES communities(id)
+        )
+    `
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS votes(
+            user_id UUID  NOT NULL,
+            post_id UUID  NOT NULL,
+            value INT,
+
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(post_id) REFERENCES posts(id),
+
+            UNIQUE(user_id, post_id)
         )
     `
 }

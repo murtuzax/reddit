@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Reddit+Sans:ital,wght@0,200..900;1,200..900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,7 +9,7 @@
   /* Backgrounds */
   --color-bg: #F6F7F8;
   --color-surface: #FFFFFF;
-  --color-elevated: #F0F2F3;
+  --color-elevated: #E5EBEE;
 
   /* Borders */
   --color-border: #D9DDE0;
@@ -22,4 +23,17 @@
   --color-danger: #EF4444;
   --color-warning: #F59E0B;
   --color-info: #3B82F6;
+
+  --color-text: #1A1A1B;
+  /* Primary text */
+  --color-text-secondary: #57606A;
+  /* Secondary text */
+  --color-text-muted: #878A8C;
+  /* Muted text */
+  --color-text-inverse: #FFFFFF;
+  /* Text on dark/brand backgrounds */
+}
+
+body {
+  font-family: "Reddit Sans", sans-serif;
 }
